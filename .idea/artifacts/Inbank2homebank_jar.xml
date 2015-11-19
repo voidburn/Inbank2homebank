@@ -1,0 +1,9 @@
+<component name="ArtifactManager">
+  <artifact type="jar" build-on-make="true" name="Inbank2homebank:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/Inbank2homebank_jar</output-path>
+    <root id="archive" name="inbank2homebank.jar">
+      <element id="module-output" name="Inbank2homebank" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/libs/opencsv-3.6.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>
