@@ -195,6 +195,7 @@ public class Main {
      * Save processed buffer to output file
      */
     private static void saveOutput() {
+        // Open a handle to the output file
         CSVWriter writer = null;
         try {
             writer = new CSVWriter(new FileWriter(outputFileName), ';', CSVWriter.NO_QUOTE_CHARACTER);
@@ -202,12 +203,12 @@ public class Main {
             e.printStackTrace();
         }
 
-        // feed in your array (or convert your data to an array)
+        // Write all rows to the file
         for (String[] entry: outputBuffer) {
             writer.writeNext(entry);
         }
 
-        // Close
+        // Close the file handle
         try {
             writer.close();
         } catch (IOException e) {
