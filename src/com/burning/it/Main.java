@@ -2,6 +2,7 @@ package com.burning.it;
 
 import com.opencsv.CSVReader;
 import com.opencsv.CSVWriter;
+import org.apache.commons.cli.*;
 
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -11,79 +12,103 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Main {
-    private static String inputFileName;
-    private static String outputFileName;
-    private static int entriesMigrated = 0;
-    private static int entriesSkipped = 0;
-
-    // Inbank CSV number of fields
+    // Settings
     public static final int InbankFieldsNum = 8;
-
-    // Inbank CSV field mapping
-    public class InbankFields {
-        public static final int DATACONTABILE = 0;
-        public static final int DATAVALUTA = 1;
-        public static final int DARE = 2;
-        public static final int AVERE = 3;
-        public static final int VALUTA = 4;
-        public static final int DESCRIZIONE = 5;
-        public static final int CAUSALE = 6;
-    }
-
-    // Homebank CSV number of fields
     public static final int HomebankFieldsNum = 8;
+    public static final int skipAtStart = 2;
+    public static final int skipAtEnd = 3;
 
-    // Defaults
+    // Homebank import default values if null in Inbank
     public static final String DefaultPaymode = "0";
     public static final String DefaultInfo = "";
     public static final String DefaultPayee = "";
     public static final String DefaultCategory = "";
     public static final String DefaultTag = "generic";
 
-    // Homebank CSV field mapping
-    public class HomebankFields {
-        public static final int DATE = 0;
-        public static final int PAYMODE = 1;
-        public static final int INFO = 2;
-        public static final int PAYEE = 3;
-        public static final int MEMO = 4;
-        public static final int AMOUNT = 5;
-        public static final int CATEGORY = 6;
-        public static final int TAGS = 7;
-    }
+    // Tracking fields
+    private static String inputFileName;
+    private static String outputFileName;
+    private static int entriesMigrated = 0;
+    private static int entriesSkipped = 0;
 
-    // Ouput buffer
+    // Output buffer
     private static List<String[]> outputBuffer = new ArrayList<String[]>();
 
+    // Inbank CSV field mapping (filed name => cell index in row
+    public static class InbankFields {
+        public static final int DATACONTABILE = 0;  // Unused
+        public static final int DATAVALUTA = 1;     // Transaction date
+        public static final int DARE = 2;           // Expense
+        public static final int AVERE = 3;          // Income
+        public static final int VALUTA = 4;         // Currency
+        public static final int DESCRIZIONE = 5;    // Description
+        public static final int CAUSALE = 6;        // Internal transaction category code
+    }
+
+    // Homebank CSV field mapping
+    public static class HomebankFields {
+        public static final int DATE = 0;           // Transaction date
+        public static final int PAYMODE = 1;        // Paymode
+        public static final int INFO = 2;           // Info
+        public static final int PAYEE = 3;          // Payee
+        public static final int MEMO = 4;           // Description
+        public static final int AMOUNT = 5;         // Normalized amount
+        public static final int CATEGORY = 6;       // Category
+        public static final int TAGS = 7;           // Tags
+    }
+
+    // Command line management
+    private static CommandLine cmd = null;
+    private static final Options options = new Options();
+    private static final CommandLineParser parser = new DefaultParser();
+    private static final HelpFormatter formatter = new HelpFormatter();
+
+    /**
+     * Entry point
+     * @param args
+     */
     public static void main(String[] args) {
-        // Manage arguments
-        switch (args.length) {
-            case 0:
-                System.out.println("Usage: inbank2homebank [path/to/input.csv] [optional: path/to/output.csv]");
-                System.exit(0);
-                break;
-            case 1:
-                inputFileName = args[0];
-                outputFileName = inputFileName + ".out";
-                break;
-            case 2:
-                inputFileName = args[0];
-                outputFileName = args[1];
-                break;
-            default:
-                System.out.println("Too many parameters");
-                System.exit(0);
+        // Command line options
+        options.addOption("in", true, "Input file");
+        options.addOption("out", true, "Output file (optional, defaults to 'inputfilename.out.csv')");
+
+        // Parse command line
+        try {
+            // parse the command line arguments
+            cmd = parser.parse( options, args );
+        }
+        catch( ParseException exp ) {
+            // oops, something went wrong
+            System.err.println( "Parsing failed.  Reason: " + exp.getMessage() );
         }
 
-        // Process files
-        if (!inputFileName.isEmpty() && !outputFileName.isEmpty()) {
-            processCsv();
+        // Process the input file command line
+        if (cmd.hasOption("in")) {
+            // Input file
+            inputFileName = cmd.getOptionValue("in");
+
+            // Output file
+            if (cmd.hasOption("out")) {
+                outputFileName = cmd.getOptionValue("out");
+            } else {
+                outputFileName = inputFileName.substring(0, inputFileName.length() -4) + ".out.csv";
+            }
+
+            // Process files
+            if (!inputFileName.isEmpty() && !outputFileName.isEmpty()) {
+                processCsv();
+            } else {
+                System.out.println("Input or Output file path/names are invalid");
+                System.exit(0);
+            }
         } else {
-            System.out.println("Input or Output file path/names are invalid");
-            System.exit(0);
+            printHelp();
         }
     }
 
+    /**
+     * Migration processing
+     */
     private static void processCsv() {
         System.out.println("Input filename: " + inputFileName);
         System.out.println("Output filename: " + outputFileName);
@@ -109,23 +134,32 @@ public class Main {
         // We have data, let's process it
         // TODO: Skip N lines at the beginning and N lines at the end: change iteration on csvEntries with standard for iterator over array
         if (csvEntries != null) {
-            for (String[] entry: csvEntries) {
+            int start = skipAtStart;
+            int end = csvEntries.size() - skipAtEnd;
+
+            System.out.println("Starting at row: " + start + ", skipping " + skipAtStart + " line(s) at the start");
+            System.out.println("Ending at row: " + end + ", skipping " + skipAtEnd + " line(s) at the end");
+
+            for (int i = start; i < end; i++) {
+                // Fetch row
+                String[] row = csvEntries.get(i);
+
                 // Skip this row if it doesn't match the column count we expect
-                if (entry.length == InbankFieldsNum) {
+                if (row.length == InbankFieldsNum) {
                     String[] newRow = new String[HomebankFieldsNum];
 
                     ////////////////////////////////////////////////////////////////////////////////
                     // Create the new row
-                    newRow[HomebankFields.DATE] = entry[InbankFields.DATAVALUTA];
+                    newRow[HomebankFields.DATE] = row[InbankFields.DATAVALUTA];
                     newRow[HomebankFields.PAYMODE] = DefaultPaymode;
                     newRow[HomebankFields.INFO] = DefaultInfo;
                     newRow[HomebankFields.PAYEE] = DefaultPayee;
-                    newRow[HomebankFields.MEMO] = entry[InbankFields.DESCRIZIONE];
+                    newRow[HomebankFields.MEMO] = row[InbankFields.DESCRIZIONE];
 
-                    if (!entry[InbankFields.DARE].isEmpty()) {
-                        newRow[HomebankFields.AMOUNT] = "-" + entry[InbankFields.DARE];
+                    if (!row[InbankFields.DARE].isEmpty()) {
+                        newRow[HomebankFields.AMOUNT] = "-" + row[InbankFields.DARE];
                     } else {
-                        newRow[HomebankFields.AMOUNT] = entry[InbankFields.AVERE];
+                        newRow[HomebankFields.AMOUNT] = row[InbankFields.AVERE];
                     }
 
                     newRow[HomebankFields.CATEGORY] = DefaultCategory;
@@ -158,6 +192,9 @@ public class Main {
         }
     }
 
+    /**
+     * Save processed buffer to output file
+     */
     private static void saveOutput() {
         CSVWriter writer = null;
         try {
@@ -177,5 +214,12 @@ public class Main {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Print command line help
+     */
+    private static void printHelp() {
+        formatter.printHelp( "inbank2homebank", options );
     }
 }
