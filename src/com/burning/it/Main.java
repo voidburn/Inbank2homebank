@@ -132,7 +132,6 @@ public class Main {
         }
 
         // We have data, let's process it
-        // TODO: Skip N lines at the beginning and N lines at the end: change iteration on csvEntries with standard for iterator over array
         if (csvEntries != null) {
             int start = skipAtStart;
             int end = csvEntries.size() - skipAtEnd;
