@@ -34,7 +34,7 @@ public class Main {
     // Output buffer
     private static List<String[]> outputBuffer = new ArrayList<String[]>();
 
-    // Inbank CSV field mapping (filed name => cell index in row
+    // Inbank CSV field mapping (filed name => cell index in row)
     public static class InbankFields {
         public static final int DATACONTABILE = 0;  // Unused
         public static final int DATAVALUTA = 1;     // Transaction date
@@ -45,7 +45,7 @@ public class Main {
         public static final int CAUSALE = 6;        // Internal transaction category code
     }
 
-    // Homebank CSV field mapping
+    // Homebank CSV field mapping (filed name => cell index in row)
     public static class HomebankFields {
         public static final int DATE = 0;           // Transaction date
         public static final int PAYMODE = 1;        // Paymode
