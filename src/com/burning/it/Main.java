@@ -36,13 +36,10 @@ public class Main {
 
     // Inbank CSV field mapping (filed name => cell index in row)
     public static class InbankFields {
-        public static final int DATACONTABILE = 0;  // Unused
         public static final int DATAVALUTA = 1;     // Transaction date
         public static final int DARE = 2;           // Expense
         public static final int AVERE = 3;          // Income
-        public static final int VALUTA = 4;         // Currency
         public static final int DESCRIZIONE = 5;    // Description
-        public static final int CAUSALE = 6;        // Internal transaction category code
     }
 
     // Homebank CSV field mapping (filed name => cell index in row)
@@ -63,9 +60,11 @@ public class Main {
     private static final CommandLineParser parser = new DefaultParser();
     private static final HelpFormatter formatter = new HelpFormatter();
 
+
     /**
      * Entry point
-     * @param args
+     *
+     * @param args command line arguments
      */
     public static void main(String[] args) {
         // Command line options
@@ -75,11 +74,10 @@ public class Main {
         // Parse command line
         try {
             // parse the command line arguments
-            cmd = parser.parse( options, args );
-        }
-        catch( ParseException exp ) {
+            cmd = parser.parse(options, args);
+        } catch (ParseException exp) {
             // oops, something went wrong
-            System.err.println( "Parsing failed.  Reason: " + exp.getMessage() );
+            System.err.println("Parsing failed.  Reason: " + exp.getMessage());
         }
 
         // Process the input file command line
@@ -91,7 +89,7 @@ public class Main {
             if (cmd.hasOption("out")) {
                 outputFileName = cmd.getOptionValue("out");
             } else {
-                outputFileName = inputFileName.substring(0, inputFileName.length() -4) + ".out.csv";
+                outputFileName = inputFileName.substring(0, inputFileName.length() - 4) + ".out.csv";
             }
 
             // Process files
@@ -166,11 +164,8 @@ public class Main {
                     // New row END
                     ////////////////////////////////////////////////////////////////////////////////
 
-                    if (newRow != null) {
-                        outputBuffer.add(newRow);
-                    } else {
-                        System.out.println("Nothing to write");
-                    }
+                    // Append new row to the output buffer
+                    outputBuffer.add(newRow);
 
                     // Next line
                     entriesMigrated++;
@@ -204,15 +199,17 @@ public class Main {
         }
 
         // Write all rows to the file
-        for (String[] entry: outputBuffer) {
-            writer.writeNext(entry);
-        }
+        if (writer != null) {
+            for (String[] entry : outputBuffer) {
+                writer.writeNext(entry);
+            }
 
-        // Close the file handle
-        try {
-            writer.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+            // Close the file handle
+            try {
+                writer.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -220,6 +217,6 @@ public class Main {
      * Print command line help
      */
     private static void printHelp() {
-        formatter.printHelp( "inbank2homebank", options );
+        formatter.printHelp("inbank2homebank", options);
     }
 }
