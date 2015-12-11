@@ -1,4 +1,4 @@
-package com.burning.it;
+package com.burning.it.i2h;
 
 import com.opencsv.CSVReader;
 import com.opencsv.CSVWriter;
