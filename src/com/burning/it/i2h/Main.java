@@ -15,8 +15,8 @@ public class Main {
     // Settings
     public static final int InbankFieldsNum = 8;
     public static final int HomebankFieldsNum = 8;
-    public static final int skipAtStart = 2;
-    public static final int skipAtEnd = 3;
+    public static int skipAtStart = 1;
+    public static int skipAtEnd = 3;
 
     // Homebank import default values if null in Inbank
     public static final String DefaultPaymode = "0";
@@ -70,6 +70,8 @@ public class Main {
         // Command line options
         options.addOption("in", true, "Input file");
         options.addOption("out", true, "Output file (optional, defaults to 'inputfilename.out.csv')");
+        options.addOption("skipstart", true, "How many rows to skip at the start of the csv file (default 1)");
+        options.addOption("skipend", true, "How many rows to skip at the end of the csv file (default 3)");
 
         // Parse command line
         try {
@@ -90,6 +92,28 @@ public class Main {
                 outputFileName = cmd.getOptionValue("out");
             } else {
                 outputFileName = inputFileName.substring(0, inputFileName.length() - 4) + ".out.csv";
+            }
+
+            // Skip start
+            if (cmd.hasOption("skipstart")) {
+                try {
+                    int skipStartValue = Integer.parseInt(cmd.getOptionValue("skipstart"));
+                    skipAtStart = skipStartValue;
+                } catch (NumberFormatException e) {
+                    System.out.println("[ERROR] skipstart argument does not contain a valid integer number");
+                    printHelp();
+                }
+            }
+
+            // Skip end
+            if (cmd.hasOption("skipend")) {
+                try {
+                    int skipEndValue = Integer.parseInt(cmd.getOptionValue("skipend"));
+                    skipAtEnd = skipEndValue;
+                } catch (NumberFormatException e) {
+                    System.out.println("[ERROR] skipend argument does not contain a valid integer number");
+                    printHelp();
+                }
             }
 
             // Process files
