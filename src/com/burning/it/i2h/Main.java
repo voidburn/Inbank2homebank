@@ -12,18 +12,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Main {
+    // Supported banks
+    private enum BANK {
+        INBANK,
+        MEDIOLANUM
+    }
+
     // Settings
-    public static final int InbankFieldsNum = 8;
-    public static final int HomebankFieldsNum = 8;
-    public static int skipAtStart = 1;
-    public static int skipAtEnd = 3;
+    private static final int HomebankFieldsNum = 8;
+    private static int inbankFieldsNum;
+    private static int mediolanumFieldsNum;
+    private static int skipAtStart;
+    private static int skipAtEnd;
+    private static BANK selectedBank;
 
     // Homebank import default values if null in Inbank
-    public static final String DefaultPaymode = "0";
-    public static final String DefaultInfo = "";
-    public static final String DefaultPayee = "";
-    public static final String DefaultCategory = "";
-    public static final String DefaultTag = "generic";
+    private static final String DefaultPaymode = "0";
+    private static final String DefaultInfo = "";
+    private static final String DefaultPayee = "";
+    private static final String DefaultCategory = "";
+    private static final String DefaultTag = "generic";
 
     // Tracking fields
     private static String inputFileName;
@@ -32,26 +40,33 @@ public class Main {
     private static int entriesSkipped = 0;
 
     // Output buffer
-    private static List<String[]> outputBuffer = new ArrayList<String[]>();
+    private static List<String[]> outputBuffer = new ArrayList<>();
 
     // Inbank CSV field mapping (filed name => cell index in row)
-    public static class InbankFields {
-        public static final int DATAVALUTA = 1;     // Transaction date
-        public static final int DARE = 2;           // Expense
-        public static final int AVERE = 3;          // Income
-        public static final int DESCRIZIONE = 5;    // Description
+    private static class InbankFields {
+        private static final int DATAVALUTA = 1;     // Transaction date
+        private static final int DARE = 2;           // Expense
+        private static final int AVERE = 3;          // Income
+        private static final int DESCRIZIONE = 5;    // Description
+    }
+    
+    private static class MediolanumFields {
+        private static final int DATAVALUTA = 1;     // Transaction date
+        private static final int DARE = 5;           // Expense
+        private static final int AVERE = 4;          // Income
+        private static final int DESCRIZIONE = 3;    // Description
     }
 
     // Homebank CSV field mapping (filed name => cell index in row)
-    public static class HomebankFields {
-        public static final int DATE = 0;           // Transaction date
-        public static final int PAYMODE = 1;        // Paymode
-        public static final int INFO = 2;           // Info
-        public static final int PAYEE = 3;          // Payee
-        public static final int MEMO = 4;           // Description
-        public static final int AMOUNT = 5;         // Normalized amount
-        public static final int CATEGORY = 6;       // Category
-        public static final int TAGS = 7;           // Tags
+    private static class HomebankFields {
+        private static final int DATE = 0;           // Transaction date
+        private static final int PAYMODE = 1;        // Paymode
+        private static final int INFO = 2;           // Info
+        private static final int PAYEE = 3;          // Payee
+        private static final int MEMO = 4;           // Description
+        private static final int AMOUNT = 5;         // Normalized amount
+        private static final int CATEGORY = 6;       // Category
+        private static final int TAGS = 7;           // Tags
     }
 
     // Command line management
@@ -68,6 +83,7 @@ public class Main {
      */
     public static void main(String[] args) {
         // Command line options
+        options.addOption("bank", true, "Bank type. Supported types: inbank, mediolanum");
         options.addOption("in", true, "Input file");
         options.addOption("out", true, "Output file (optional, defaults to 'inputfilename.out.csv')");
         options.addOption("skipstart", true, "How many rows to skip at the start of the csv file (default 1)");
@@ -94,11 +110,33 @@ public class Main {
                 outputFileName = inputFileName.substring(0, inputFileName.length() - 4) + ".out.csv";
             }
 
+            if (cmd.hasOption("bank")) {
+                try {
+                    String bankDataStructure = cmd.getOptionValue("bank");
+
+                    switch(bankDataStructure) {
+                        case "inbank":
+                            selectBank(BANK.INBANK);
+                            break;
+                        case "mediolanum":
+                            selectBank(BANK.MEDIOLANUM);
+                            break;
+                        default:
+                            throw new IllegalArgumentException("Unknown bank type");
+                    }
+                } catch (Exception e) {
+                    System.out.println("[ERROR] unknown bank type");
+                    printHelp();
+                }
+            } else {
+                System.out.println("[WARNING] No bank specified, defaulting to INBANK");
+                selectBank(BANK.INBANK);
+            }
+
             // Skip start
             if (cmd.hasOption("skipstart")) {
                 try {
-                    int skipStartValue = Integer.parseInt(cmd.getOptionValue("skipstart"));
-                    skipAtStart = skipStartValue;
+                    skipAtStart = Integer.parseInt(cmd.getOptionValue("skipstart"));
                 } catch (NumberFormatException e) {
                     System.out.println("[ERROR] skipstart argument does not contain a valid integer number");
                     printHelp();
@@ -108,8 +146,7 @@ public class Main {
             // Skip end
             if (cmd.hasOption("skipend")) {
                 try {
-                    int skipEndValue = Integer.parseInt(cmd.getOptionValue("skipend"));
-                    skipAtEnd = skipEndValue;
+                    skipAtEnd = Integer.parseInt(cmd.getOptionValue("skipend"));
                 } catch (NumberFormatException e) {
                     System.out.println("[ERROR] skipend argument does not contain a valid integer number");
                     printHelp();
@@ -125,6 +162,27 @@ public class Main {
             }
         } else {
             printHelp();
+        }
+    }
+
+    /**
+     * Set defaults in order to work with the specified bank
+     *
+     * @param type bank type
+     */
+    private static void selectBank(BANK type) {
+        switch (type) {
+            case MEDIOLANUM:
+                mediolanumFieldsNum = 11;
+                skipAtStart = 4;
+                skipAtEnd = 0;
+                selectedBank = type;
+                break;
+            case INBANK:
+                inbankFieldsNum = 8;
+                skipAtStart = 1;
+                skipAtEnd = 3;
+                selectedBank = type;
         }
     }
 
@@ -165,37 +223,73 @@ public class Main {
                 // Fetch row
                 String[] row = csvEntries.get(i);
 
-                // Skip this row if it doesn't match the column count we expect
-                if (row.length == InbankFieldsNum) {
-                    String[] newRow = new String[HomebankFieldsNum];
+                ////////////////////////////////////////////////////////////////////////////////
+                // Create the new row for INBANK
+                if (selectedBank == BANK.INBANK) {
+                    if (row.length == inbankFieldsNum) {
+                        String[] newRow = new String[HomebankFieldsNum];
 
-                    ////////////////////////////////////////////////////////////////////////////////
-                    // Create the new row
-                    newRow[HomebankFields.DATE] = row[InbankFields.DATAVALUTA];
-                    newRow[HomebankFields.PAYMODE] = DefaultPaymode;
-                    newRow[HomebankFields.INFO] = DefaultInfo;
-                    newRow[HomebankFields.PAYEE] = DefaultPayee;
-                    newRow[HomebankFields.MEMO] = row[InbankFields.DESCRIZIONE];
+                        newRow[HomebankFields.DATE] = row[InbankFields.DATAVALUTA];
+                        newRow[HomebankFields.PAYMODE] = DefaultPaymode;
+                        newRow[HomebankFields.INFO] = DefaultInfo;
+                        newRow[HomebankFields.PAYEE] = DefaultPayee;
+                        newRow[HomebankFields.MEMO] = row[InbankFields.DESCRIZIONE];
 
-                    if (!row[InbankFields.DARE].isEmpty()) {
-                        newRow[HomebankFields.AMOUNT] = "-" + row[InbankFields.DARE];
+                        if (!row[InbankFields.DARE].isEmpty()) {
+                            newRow[HomebankFields.AMOUNT] = "-" + row[InbankFields.DARE];
+                        } else {
+                            newRow[HomebankFields.AMOUNT] = row[InbankFields.AVERE];
+                        }
+
+                        newRow[HomebankFields.CATEGORY] = DefaultCategory;
+                        newRow[HomebankFields.TAGS] = DefaultTag;
+
+                        // Append new row to the output buffer
+                        outputBuffer.add(newRow);
+
+                        // Next line
+                        entriesMigrated++;
                     } else {
-                        newRow[HomebankFields.AMOUNT] = row[InbankFields.AVERE];
+                        System.out.println("Skipping non matching row. Expected length: [" + inbankFieldsNum + "], found: " + row.length);
+                        entriesSkipped++;
                     }
-
-                    newRow[HomebankFields.CATEGORY] = DefaultCategory;
-                    newRow[HomebankFields.TAGS] = DefaultTag;
-                    // New row END
-                    ////////////////////////////////////////////////////////////////////////////////
-
-                    // Append new row to the output buffer
-                    outputBuffer.add(newRow);
-
-                    // Next line
-                    entriesMigrated++;
-                } else {
-                    entriesSkipped++;
                 }
+                // New row END
+                ////////////////////////////////////////////////////////////////////////////////
+
+                ////////////////////////////////////////////////////////////////////////////////
+                // Create the new row for MEDIOLANUM
+                if (selectedBank == BANK.MEDIOLANUM) {
+                    if (row.length == mediolanumFieldsNum) {
+                        String[] newRow = new String[HomebankFieldsNum];
+
+                        newRow[HomebankFields.DATE] = row[MediolanumFields.DATAVALUTA];
+                        newRow[HomebankFields.PAYMODE] = DefaultPaymode;
+                        newRow[HomebankFields.INFO] = DefaultInfo;
+                        newRow[HomebankFields.PAYEE] = DefaultPayee;
+                        newRow[HomebankFields.MEMO] = row[MediolanumFields.DESCRIZIONE];
+
+                        if (!row[MediolanumFields.DARE].isEmpty()) {
+                            newRow[HomebankFields.AMOUNT] = "-" + row[MediolanumFields.DARE];
+                        } else {
+                            newRow[HomebankFields.AMOUNT] = row[MediolanumFields.AVERE];
+                        }
+
+                        newRow[HomebankFields.CATEGORY] = DefaultCategory;
+                        newRow[HomebankFields.TAGS] = DefaultTag;
+
+                        // Append new row to the output buffer
+                        outputBuffer.add(newRow);
+
+                        // Next line
+                        entriesMigrated++;
+                    } else {
+                        System.out.println("Skipping non matching row. Expected length: [" + mediolanumFieldsNum + "], found: " + row.length);
+                        entriesSkipped++;
+                    }
+                }
+                // New row END
+                ////////////////////////////////////////////////////////////////////////////////
             }
 
             // Save output file
