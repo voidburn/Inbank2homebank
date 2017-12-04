@@ -52,8 +52,8 @@ public class Main {
     
     private static class MediolanumFields {
         private static final int DATAVALUTA = 1;     // Transaction date
-        private static final int DARE = 5;           // Expense
-        private static final int AVERE = 4;          // Income
+        private static final int DARE = 4;           // Expense
+        private static final int AVERE = 5;          // Income
         private static final int DESCRIZIONE = 3;    // Description
     }
 
@@ -174,7 +174,7 @@ public class Main {
         switch (type) {
             case MEDIOLANUM:
                 mediolanumFieldsNum = 11;
-                skipAtStart = 4;
+                skipAtStart = 5;
                 skipAtEnd = 0;
                 selectedBank = type;
                 break;
